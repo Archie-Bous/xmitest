@@ -205,33 +205,33 @@ function renderQuality(quality) {
   const score = quality.overall_score ?? 0;
   const grade = quality.grade ?? "F";
 
-  // Grade badge colour
-  const gradeColour = { A: "#22c55e", B: "#84cc16", C: "#eab308", D: "#f97316", F: "#ef4444" };
-  const colour = gradeColour[grade] || "#ef4444";
+  // Grade badge color
+  const gradeColor = { A: "#22c55e", B: "#84cc16", C: "#eab308", D: "#f97316", F: "#ef4444" };
+  const color = gradeColor[grade] || "#ef4444";
 
   $("quality-grade").textContent = grade;
-  $("quality-grade").style.color = colour;
+  $("quality-grade").style.color = color;
   $("quality-score-label").textContent = `${score} / 100`;
 
   const fill = $("quality-bar-fill");
   fill.style.width = `${score}%`;
-  fill.style.background = colour;
+  fill.style.background = color;
 
   // Per-criterion rows
   const criteriaEl = $("quality-criteria");
   criteriaEl.innerHTML = (quality.criteria || []).map((c) => {
     const pct = c.score ?? 0;
-    const barColour = pct >= 80 ? "#22c55e" : pct >= 60 ? "#eab308" : "#ef4444";
+    const barColor = pct >= 80 ? "#22c55e" : pct >= 60 ? "#eab308" : "#ef4444";
     const pctLabel = `${Math.round(c.weight * 100)}%`;
     return `
       <div class="qc-row">
         <div class="qc-meta">
           <span class="qc-name" title="${_esc(c.description)}">${_esc(c.name)}</span>
           <span class="qc-weight">${pctLabel}</span>
-          <span class="qc-score" style="color:${barColour}">${pct}</span>
+          <span class="qc-score" style="color:${barColor}">${pct}</span>
         </div>
         <div class="qc-bar-track">
-          <div class="qc-bar-fill" style="width:${pct}%;background:${barColour}"></div>
+          <div class="qc-bar-fill" style="width:${pct}%;background:${barColor}"></div>
         </div>
         ${c.issues && c.issues.length ? `
           <ul class="qc-issues">

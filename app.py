@@ -1653,7 +1653,10 @@ def _score_structural_richness(model: dict) -> tuple[int, list[str]]:
             "between classifiers"
         )
 
-    if model.get("use_cases") or model.get("actors") or model.get("state_machines") or model.get("interactions"):
+    has_behaviour = any(
+        model.get(k) for k in ("use_cases", "actors", "state_machines", "interactions")
+    )
+    if has_behaviour:
         score += 25
     else:
         issues.append(
@@ -1692,8 +1695,20 @@ def _score_design_balance(model: dict) -> tuple[int, list[str]]:
             "consider splitting responsibilities"
         )
 
-    # Deep inheritance
-    max_depth = max((len(c.get("generalizations", [])) for c in classes), default=0)
+    # Deep inheritance – traverse the hierarchy tree to compute true chain depth
+    parent_map: dict[str, list[str]] = {
+        c["name"]: c.get("generalizations", []) for c in classes
+    }
+
+    def _chain_depth(name: str, visited: frozenset) -> int:
+        if name in visited:
+            return 0  # cycle guard
+        parents = [p for p in parent_map.get(name, []) if p in parent_map]
+        if not parents:
+            return 0
+        return 1 + max(_chain_depth(p, visited | {name}) for p in parents)
+
+    max_depth = max((_chain_depth(c["name"], frozenset()) for c in classes), default=0)
     if max_depth > 5:
         score -= 20
         issues.append(
