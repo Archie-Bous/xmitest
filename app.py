@@ -8,10 +8,16 @@ Supports:
   - XMI 2.x  (standard: Eclipse UML2, MagicDraw/Cameo, Papyrus, Visual Paradigm, Sparx EA)
   - XMI 1.x  (Rational Rose and legacy tools – dot-notation IDs, UML: namespace tags)
   - Enterprise Architect proprietary <xmi:Extension> block (elements, connectors, diagrams)
+  - PTC Integrity Modeler / MKS Integrity Modeler / Windchill Modeler (noise filtering)
+  - IBM RSA / Rhapsody and other Eclipse GMF-based tools (notation namespace filtering)
   - xsi:type attribute (used by some tools instead of xmi:type)
   - Stereotypes, tagged values, profiles
   - State machines and sequence/interaction diagrams
   - HREF-based primitive type resolution
+
+Quality Scoring:
+  parse_xmi() returns a ``quality`` dict with overall_score (0-100), grade (A–F),
+  and six weighted criteria so callers and the UI can benchmark the model.
 """
 
 import os
@@ -62,6 +68,62 @@ _HREF_TYPE_MAP = {
     "java.lang.Boolean": "Boolean", "java.lang.Long": "Long",
     "java.lang.Double": "Double",
 }
+
+# ---------------------------------------------------------------------------
+# Noise filtering – proprietary tool namespaces and layout-only elements
+# ---------------------------------------------------------------------------
+
+# Namespace URI substrings that indicate a proprietary / rendering-only NS.
+# Elements whose namespace matches one of these patterns carry no UML semantics
+# and should be silently skipped during parsing.
+_NOISE_NS_PATTERNS = frozenset({
+    "ptc.com",              # PTC Integrity Modeler / Windchill Modeler
+    "mks.com",              # MKS Integrity Modeler (legacy)
+    "integrity.mks",        # MKS Integrity (alternate URI)
+    "windchill",            # PTC Windchill
+    "notation",             # Eclipse GMF Notation (diagrams / layout)
+    "gmf.notation",         # GMF notation variant
+    "rsm.ibm",              # IBM RSA model-explorer metadata
+    "style",                # Generic Eclipse style namespaces
+    "ecore/2002/Ecore",     # Ecore metamodel artefacts inside XMI
+})
+
+# Local element names that are purely graphical / layout – skip regardless of
+# which tool produced them.
+_LAYOUT_ELEMENT_LOCALS = frozenset({
+    "appearance", "presentation", "renderingData",
+    "diagramElement", "drawingObject", "graphElement", "graphConnector",
+    "notationView", "bounds", "layoutConstraint",
+    "shapeStyle", "connectorStyle",
+})
+
+# Tagged-value tag names that are tool-internal graphical metadata and add no
+# semantic value for a UML quality review.
+_NOISE_TAGGED_VALUE_KEYS = frozenset({
+    "x", "y", "width", "height", "color", "background",
+    "font", "fontSize", "styleLine", "styleColor",
+    "ea_ntype", "ea_stype", "ea_ele_id",   # Sparx EA internal keys
+    "isRoot", "isLeaf", "isActive",         # EA flags that mirror XMI attrs
+})
+
+
+def _is_noise_ns(element) -> bool:
+    """Return True when the element belongs to a proprietary / rendering NS."""
+    ns = _ns_uri(element)
+    if not ns:
+        return False
+    ns_lower = ns.lower()
+    return any(pattern in ns_lower for pattern in _NOISE_NS_PATTERNS)
+
+
+def _is_layout_element(element) -> bool:
+    """Return True for elements that carry only graphical layout information."""
+    return _tag_local(element) in _LAYOUT_ELEMENT_LOCALS
+
+
+def _filter_tagged_values(tvs: list[dict]) -> list[dict]:
+    """Remove tagged values whose keys are known graphical/tool-internal keys."""
+    return [tv for tv in tvs if tv.get("tag", "") not in _NOISE_TAGGED_VALUE_KEYS]
 
 
 # ---------------------------------------------------------------------------
@@ -228,12 +290,14 @@ def _detect_format(root) -> dict:
                 info["tool_version"] = ver
             break
         # MagicDraw / Cameo stores tool in a different attribute
-        if local == "umlVersion" or "magicdraw" in child.get("exporter", "").lower():
+        if local == "umlVersion" or "magicdraw" in (child.get("exporter") or "").lower():
             info["tool"] = "MagicDraw / Cameo"
             break
 
     # EA-specific: check for Extension extender attribute
     for child in root:
+        if callable(child.tag):
+            continue
         local = _tag_local(child)
         extender = child.get("extender", "")
         if local == "Extension" and extender:
@@ -253,10 +317,30 @@ def _detect_format(root) -> dict:
                 return True
             return any(fragment in ns for ns in ns_values)
 
-        if _ns_contains("eclipse.org"):
+        # PTC Integrity Modeler / MKS Integrity Modeler / Windchill Modeler
+        if _ns_contains("ptc.com") or _ns_contains("windchill"):
+            info["tool"] = "PTC Integrity Modeler"
+        elif _ns_contains("mks.com") or _ns_contains("integrity.mks"):
+            info["tool"] = "MKS Integrity Modeler"
+        elif _ns_contains("rsm.ibm"):
+            info["tool"] = "IBM RSA / Rational Software Architect"
+        elif _ns_contains("eclipse.org"):
             info["tool"] = "Eclipse-based tool (Papyrus / UML2)"
         elif _ns_contains("omg.org"):
             info["tool"] = "OMG-compliant tool"
+
+    # Also check exporter strings from Documentation elements for PTC / MKS
+    if info["tool"] == "Unknown" or info["tool"] == "OMG-compliant tool":
+        for child in root:
+            local = _tag_local(child)
+            if local in ("Documentation", "XMI.documentation"):
+                exp = child.get("exporter", "").lower()
+                if "ptc" in exp or "windchill" in exp:
+                    info["tool"] = "PTC Integrity Modeler"
+                    break
+                if "mks" in exp or "integrity" in exp:
+                    info["tool"] = "MKS Integrity Modeler"
+                    break
 
     if info["xmi_version"] == "unknown" and (
         tag_local in ("XMI", "Model") or any(u in _UML_NS_URIS for u in root.nsmap.values())
@@ -307,6 +391,9 @@ def _parse_v1(root) -> dict:
 
     def walk_v1(el, package_path=""):
         if callable(el.tag):   # skip comment/PI nodes
+            return
+        # Skip elements in proprietary tool namespaces (layout, rendering, etc.)
+        if _is_noise_ns(el) or _is_layout_element(el):
             return
         local = _tag_local(el)
         name = el.get("name", "")
@@ -608,7 +695,7 @@ def _parse_v2_standard(root, id_name: dict) -> dict:
                 tag_val = child.get("value", child.get("body", ""))
                 if tag_name:
                     tvs.append({"tag": tag_name, "value": tag_val})
-        return tvs
+        return _filter_tagged_values(tvs)
 
     def _process_classifier(el, category):
         name = el.get("name", "")
@@ -806,6 +893,9 @@ def _parse_v2_standard(root, id_name: dict) -> dict:
 
     def walk(el, package_path=""):
         if callable(el.tag):   # skip comment/PI nodes
+            return
+        # Skip elements in proprietary tool namespaces (layout, rendering, etc.)
+        if _is_noise_ns(el) or _is_layout_element(el):
             return
         local = _tag_local(el)
         xtype = _get_type_attr(el)
@@ -1358,6 +1448,376 @@ def model_to_text(model: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
+# UML Model Quality Scoring
+# ---------------------------------------------------------------------------
+
+_UPPER_CAMEL_RE = re.compile(r"^[A-Z][a-zA-Z0-9]*$")
+_LOWER_CAMEL_RE = re.compile(r"^[a-z][a-zA-Z0-9_]*$")
+
+
+def _score_naming(model: dict) -> tuple[int, list[str]]:
+    """
+    Criterion 1 – Naming Conventions (weight 15 %)
+    Classes / interfaces / enumerations → UpperCamelCase.
+    Attributes and operations           → lowerCamelCase.
+    Returns (score 0-100, list-of-issues).
+    """
+    issues: list[str] = []
+    total, good = 0, 0
+
+    # Classifier names must start with an uppercase letter
+    classifiers_for_naming = (
+        model.get("classes", [])
+        + model.get("interfaces", [])
+        + model.get("enumerations", [])
+    )
+    for item in classifiers_for_naming:
+        name = item.get("name", "")
+        if not name:
+            continue
+        total += 1
+        if _UPPER_CAMEL_RE.match(name):
+            good += 1
+        else:
+            issues.append(
+                f"Classifier '{name}' should use UpperCamelCase"
+            )
+
+    # Member names must start with a lowercase letter
+    all_classifiers = (
+        model.get("classes", [])
+        + model.get("interfaces", [])
+        + model.get("actors", [])
+        + model.get("use_cases", [])
+    )
+    for c in all_classifiers:
+        for a in c.get("attributes", []):
+            name = a.get("name", "")
+            if not name:
+                continue
+            total += 1
+            if _LOWER_CAMEL_RE.match(name):
+                good += 1
+            else:
+                issues.append(f"Attribute '{name}' should use lowerCamelCase")
+        for o in c.get("operations", []):
+            name = o.get("name", "")
+            if not name:
+                continue
+            total += 1
+            if _LOWER_CAMEL_RE.match(name):
+                good += 1
+            else:
+                issues.append(f"Operation '{name}' should use lowerCamelCase")
+
+    score = round(100 * good / total) if total > 0 else 100
+    # Deduplicate and cap at 5 reported issues
+    return score, list(dict.fromkeys(issues))[:5]
+
+
+def _score_documentation(model: dict) -> tuple[int, list[str]]:
+    """
+    Criterion 2 – Documentation Coverage (weight 20 %)
+    Percentage of classes, interfaces and components that have at least one
+    human-readable comment / description.
+    """
+    classifiers = (
+        model.get("classes", [])
+        + model.get("interfaces", [])
+        + model.get("components", [])
+    )
+    if not classifiers:
+        return 100, []
+
+    documented = sum(1 for c in classifiers if c.get("comments"))
+    undoc_count = len(classifiers) - documented
+    score = round(100 * documented / len(classifiers))
+
+    issues: list[str] = []
+    if undoc_count:
+        names = [c["name"] for c in classifiers if not c.get("comments")][:3]
+        suffix = "…" if undoc_count > len(names) else ""
+        issues.append(
+            f"{undoc_count}/{len(classifiers)} classifiers lack documentation: "
+            f"{', '.join(names)}{suffix}"
+        )
+    return score, issues
+
+
+def _score_type_completeness(model: dict) -> tuple[int, list[str]]:
+    """
+    Criterion 3 – Type Completeness (weight 20 %)
+    Percentage of attributes with a defined type (60 % weight) and
+    operations with a defined return type (40 % weight).
+    """
+    all_classifiers = (
+        model.get("classes", [])
+        + model.get("interfaces", [])
+        + model.get("actors", [])
+        + model.get("use_cases", [])
+        + model.get("components", [])
+    )
+    attrs = [a for c in all_classifiers for a in c.get("attributes", [])]
+    ops = [o for c in all_classifiers for o in c.get("operations", [])]
+
+    if not attrs and not ops:
+        return 100, []
+
+    typed_attrs = sum(1 for a in attrs if a.get("type"))
+    typed_ops = sum(1 for o in ops if o.get("returnType"))
+
+    attr_pct = round(100 * typed_attrs / len(attrs)) if attrs else 100
+    op_pct = round(100 * typed_ops / len(ops)) if ops else 100
+    score = round(attr_pct * 0.6 + op_pct * 0.4)
+
+    issues: list[str] = []
+    if attrs and attr_pct < 80:
+        issues.append(
+            f"Only {attr_pct}% of attributes have a defined type "
+            f"({typed_attrs}/{len(attrs)})"
+        )
+    if ops and op_pct < 60:
+        issues.append(
+            f"Only {op_pct}% of operations have a defined return type "
+            f"({typed_ops}/{len(ops)})"
+        )
+    return score, issues
+
+
+def _score_multiplicity(model: dict) -> tuple[int, list[str]]:
+    """
+    Criterion 4 – Multiplicity Completeness (weight 10 %)
+    Percentage of association ends that carry a meaningful multiplicity
+    annotation (not blank and not the bare '..' placeholder).
+    """
+    associations = model.get("associations", [])
+    if not associations:
+        return 100, []
+
+    ends = [e for a in associations for e in a.get("ends", [])]
+    if not ends:
+        return 100, []
+
+    mult_ends = sum(
+        1 for e in ends
+        if e.get("multiplicity") and e["multiplicity"] not in ("", "..")
+    )
+    score = round(100 * mult_ends / len(ends))
+
+    issues: list[str] = []
+    if score < 80:
+        issues.append(
+            f"Only {score}% of association ends have defined multiplicity "
+            f"({mult_ends}/{len(ends)})"
+        )
+    return score, issues
+
+
+def _score_structural_richness(model: dict) -> tuple[int, list[str]]:
+    """
+    Criterion 5 – Structural Richness (weight 20 %)
+    Rewards presence of interfaces, enumerations, behavioural elements
+    (use cases / actors), and inter-class relationships.
+    Each sub-criterion contributes 25 points.
+    """
+    score = 0
+    issues: list[str] = []
+
+    if model.get("interfaces"):
+        score += 25
+    else:
+        issues.append(
+            "No interfaces defined – consider extracting contracts/abstractions "
+            "to improve separation of concerns"
+        )
+
+    if model.get("enumerations"):
+        score += 25
+    else:
+        issues.append(
+            "No enumerations defined – consider using enumerations for "
+            "constrained/categorical values"
+        )
+
+    has_rels = bool(
+        model.get("associations")
+        or model.get("realizations")
+        or model.get("dependencies")
+        or model.get("generalizations")
+    )
+    if has_rels:
+        score += 25
+    else:
+        issues.append(
+            "No relationships (associations, realizations, dependencies) found "
+            "between classifiers"
+        )
+
+    if model.get("use_cases") or model.get("actors") or model.get("state_machines") or model.get("interactions"):
+        score += 25
+    else:
+        issues.append(
+            "No behavioural elements (use cases, actors, state machines) – "
+            "consider adding behavioural context"
+        )
+
+    return score, issues
+
+
+def _score_design_balance(model: dict) -> tuple[int, list[str]]:
+    """
+    Criterion 6 – Design Balance (weight 15 %)
+    Penalises god classes (> 20 members), excessively deep inheritance
+    chains, and a high proportion of isolated classes with no visible
+    relationships.  Score starts at 100 and deductions are applied.
+    """
+    classes = model.get("classes", [])
+    if not classes:
+        return 100, []
+
+    score = 100
+    issues: list[str] = []
+
+    # God classes
+    god = [
+        c["name"] for c in classes
+        if len(c.get("attributes", [])) + len(c.get("operations", [])) > 20
+    ]
+    if god:
+        penalty = min(30, len(god) * 10)
+        score -= penalty
+        names_str = ", ".join(god[:3]) + ("…" if len(god) > 3 else "")
+        issues.append(
+            f"Potential god class(es) with >20 members: {names_str} – "
+            "consider splitting responsibilities"
+        )
+
+    # Deep inheritance
+    max_depth = max((len(c.get("generalizations", [])) for c in classes), default=0)
+    if max_depth > 5:
+        score -= 20
+        issues.append(
+            f"Inheritance chain depth {max_depth} exceeds recommended limit of 5 – "
+            "favour composition over inheritance"
+        )
+
+    # Isolated classes (no visible relationship)
+    associations = model.get("associations", [])
+    realizations = model.get("realizations", [])
+    generalizations = model.get("generalizations", [])
+    connected: set[str] = set()
+    for a in associations:
+        for e in a.get("ends", []):
+            if e.get("type"):
+                connected.add(e["type"])
+    for r in realizations:
+        connected.add(r.get("client", ""))
+        connected.add(r.get("supplier", ""))
+    for g in generalizations:
+        connected.add(g.get("specific", ""))
+        connected.add(g.get("general", ""))
+    for c in classes:
+        if c.get("generalizations"):
+            connected.add(c["name"])
+
+    isolated = [c["name"] for c in classes if c["name"] not in connected]
+    if isolated and len(isolated) / len(classes) > 0.3:
+        penalty = min(20, round(len(isolated) / len(classes) * 30))
+        score -= penalty
+        names_str = ", ".join(isolated[:3]) + ("…" if len(isolated) > 3 else "")
+        issues.append(
+            f"{len(isolated)} isolated class(es) with no visible relationships: "
+            f"{names_str}"
+        )
+
+    return max(0, score), issues
+
+
+def score_model(model: dict) -> dict:
+    """
+    Evaluate the quality of a parsed UML model against six weighted criteria
+    and return a structured quality report.
+
+    Criteria and weights:
+      1. Naming Conventions    – 15 %
+      2. Documentation         – 20 %
+      3. Type Completeness     – 20 %
+      4. Multiplicity          – 10 %
+      5. Structural Richness   – 20 %
+      6. Design Balance        – 15 %
+
+    Returns a dict with:
+      overall_score  int   0-100
+      grade          str   A / B / C / D / F
+      criteria       list  per-criterion detail
+      top_issues     list  up to 5 highest-priority issues
+    """
+    raw_criteria = [
+        ("Naming Conventions",
+         "Classifiers use UpperCamelCase; attributes and operations use lowerCamelCase.",
+         0.15, _score_naming(model)),
+        ("Documentation Coverage",
+         "Percentage of classifiers (classes, interfaces, components) "
+         "that have at least one human-readable description.",
+         0.20, _score_documentation(model)),
+        ("Type Completeness",
+         "Percentage of attributes with a defined type and operations "
+         "with a defined return type.",
+         0.20, _score_type_completeness(model)),
+        ("Multiplicity Completeness",
+         "Percentage of association ends annotated with a multiplicity range.",
+         0.10, _score_multiplicity(model)),
+        ("Structural Richness",
+         "Presence of interfaces, enumerations, relationships, and "
+         "behavioural elements (use cases, actors, state machines).",
+         0.20, _score_structural_richness(model)),
+        ("Design Balance",
+         "Absence of god classes, excessively deep inheritance, "
+         "and isolated classes with no visible relationships.",
+         0.15, _score_design_balance(model)),
+    ]
+
+    criteria = []
+    for name, description, weight, (score, issues) in raw_criteria:
+        criteria.append({
+            "name": name,
+            "description": description,
+            "score": score,
+            "weight": weight,
+            "issues": issues,
+        })
+
+    overall = round(sum(c["score"] * c["weight"] for c in criteria))
+    if overall >= 90:
+        grade = "A"
+    elif overall >= 75:
+        grade = "B"
+    elif overall >= 60:
+        grade = "C"
+    elif overall >= 45:
+        grade = "D"
+    else:
+        grade = "F"
+
+    # Surface the most impactful issues (worst-scoring criteria first)
+    top_issues: list[dict] = []
+    for c in sorted(criteria, key=lambda x: x["score"]):
+        for issue in c["issues"][:2]:
+            top_issues.append({"criterion": c["name"], "issue": issue})
+            if len(top_issues) >= 5:
+                break
+        if len(top_issues) >= 5:
+            break
+
+    return {
+        "overall_score": overall,
+        "grade": grade,
+        "criteria": criteria,
+        "top_issues": top_issues,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
 
@@ -1385,11 +1845,13 @@ def upload():
         xml_bytes = file.read()
         model = parse_xmi(xml_bytes)
         summary_text = model_to_text(model)
+        quality = score_model(model)
         return jsonify({
             "model": model,
             "summary": summary_text,
             "format_info": model.get("format_info", {}),
             "warnings": model.get("warnings", []),
+            "quality": quality,
         })
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 422
@@ -1397,6 +1859,20 @@ def upload():
         return jsonify({"error": f"XML processing error: {exc}"}), 422
     except Exception as exc:  # noqa: BLE001  – catch-all for unexpected I/O errors
         return jsonify({"error": f"Failed to parse XMI: {exc}"}), 500
+
+
+@app.route("/score", methods=["POST"])
+def score():
+    """Score a previously-parsed UML model dict without re-uploading the file."""
+    data = request.get_json(silent=True) or {}
+    model = data.get("model")
+    if not model or not isinstance(model, dict):
+        return jsonify({"error": "No model provided. Pass {'model': <parsed model dict>}."}), 400
+    try:
+        quality = score_model(model)
+        return jsonify({"quality": quality})
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"error": f"Scoring error: {exc}"}), 500
 
 
 @app.route("/review", methods=["POST"])

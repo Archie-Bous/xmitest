@@ -18,6 +18,7 @@ const summaryPlaceholder = $("summary-placeholder");
 const copySummaryBtn = $("copy-summary-btn");
 const statsCard      = $("stats-card");
 const statsGrid      = $("stats-grid");
+const qualityCard    = $("quality-card");
 const apiKeyInput    = $("api-key");
 const toggleKeyBtn   = $("toggle-key");
 const eyeIcon        = $("eye-icon");
@@ -110,6 +111,10 @@ parseBtn.addEventListener("click", async () => {
     copySummaryBtn.classList.remove("hidden");
     renderStats(data.model, data.format_info, data.warnings || []);
     statsCard.classList.remove("hidden");
+    if (data.quality) {
+      renderQuality(data.quality);
+      qualityCard.classList.remove("hidden");
+    }
     reviewBtn.disabled = false;
   } catch (err) {
     showError(uploadError, `Network error: ${err.message}`);
@@ -193,6 +198,59 @@ function _esc(str) {
   return String(str)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;")
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// ── Quality Score renderer ────────────────────────────────────────────────
+function renderQuality(quality) {
+  const score = quality.overall_score ?? 0;
+  const grade = quality.grade ?? "F";
+
+  // Grade badge colour
+  const gradeColour = { A: "#22c55e", B: "#84cc16", C: "#eab308", D: "#f97316", F: "#ef4444" };
+  const colour = gradeColour[grade] || "#ef4444";
+
+  $("quality-grade").textContent = grade;
+  $("quality-grade").style.color = colour;
+  $("quality-score-label").textContent = `${score} / 100`;
+
+  const fill = $("quality-bar-fill");
+  fill.style.width = `${score}%`;
+  fill.style.background = colour;
+
+  // Per-criterion rows
+  const criteriaEl = $("quality-criteria");
+  criteriaEl.innerHTML = (quality.criteria || []).map((c) => {
+    const pct = c.score ?? 0;
+    const barColour = pct >= 80 ? "#22c55e" : pct >= 60 ? "#eab308" : "#ef4444";
+    const pctLabel = `${Math.round(c.weight * 100)}%`;
+    return `
+      <div class="qc-row">
+        <div class="qc-meta">
+          <span class="qc-name" title="${_esc(c.description)}">${_esc(c.name)}</span>
+          <span class="qc-weight">${pctLabel}</span>
+          <span class="qc-score" style="color:${barColour}">${pct}</span>
+        </div>
+        <div class="qc-bar-track">
+          <div class="qc-bar-fill" style="width:${pct}%;background:${barColour}"></div>
+        </div>
+        ${c.issues && c.issues.length ? `
+          <ul class="qc-issues">
+            ${c.issues.map(i => `<li>${_esc(i)}</li>`).join("")}
+          </ul>` : ""}
+      </div>`;
+  }).join("");
+
+  // Top issues
+  const issuesWrap = $("quality-issues-wrap");
+  const issuesList = $("quality-issues-list");
+  if (quality.top_issues && quality.top_issues.length) {
+    issuesList.innerHTML = quality.top_issues.map(
+      (ti) => `<li><strong>${_esc(ti.criterion)}:</strong> ${_esc(ti.issue)}</li>`
+    ).join("");
+    issuesWrap.classList.remove("hidden");
+  } else {
+    issuesWrap.classList.add("hidden");
+  }
 }
 
 // ── Copy summary ──────────────────────────────────────────────────────────
