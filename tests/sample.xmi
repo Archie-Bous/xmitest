@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1"
+         xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML"
+         xmlns:xmi="http://www.omg.org/XMI">
+  <uml:Model xmi:id="model1" name="OnlineShop">
+    <packagedElement xmi:type="uml:Package" xmi:id="pkg1" name="Domain">
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_customer" name="Customer">
+        <ownedComment xmi:id="cmt1" body="Represents a registered customer"/>
+        <ownedAttribute xmi:id="attr1" name="id" type="prim_int" visibility="private"/>
+        <ownedAttribute xmi:id="attr2" name="name" type="prim_str" visibility="private"/>
+        <ownedAttribute xmi:id="attr3" name="email" type="prim_str" visibility="private"/>
+        <ownedOperation xmi:id="op1" name="placeOrder" visibility="public">
+          <ownedParameter xmi:id="param1" name="order" direction="in"/>
+          <ownedParameter xmi:id="param2" direction="return"/>
+        </ownedOperation>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_order" name="Order">
+        <ownedAttribute xmi:id="attr4" name="orderId" type="prim_int" visibility="private"/>
+        <ownedAttribute xmi:id="attr5" name="totalPrice" type="prim_double" visibility="private"/>
+        <ownedOperation xmi:id="op2" name="calculateTotal" visibility="public">
+          <ownedParameter xmi:id="param3" direction="return"/>
+        </ownedOperation>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_product" name="Product">
+        <ownedAttribute xmi:id="attr6" name="productId" type="prim_int" visibility="private"/>
+        <ownedAttribute xmi:id="attr7" name="price" type="prim_double" visibility="private" lower="1" upper="1"/>
+        <ownedAttribute xmi:id="attr8" name="stock" type="prim_int" visibility="private"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Interface" xmi:id="iface1" name="Payable">
+        <ownedOperation xmi:id="op3" name="pay" visibility="public">
+          <ownedParameter xmi:id="param4" name="amount" direction="in"/>
+          <ownedParameter xmi:id="param5" direction="return"/>
+        </ownedOperation>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Enumeration" xmi:id="enum1" name="OrderStatus">
+        <ownedLiteral xmi:id="lit1" name="PENDING"/>
+        <ownedLiteral xmi:id="lit2" name="PROCESSING"/>
+        <ownedLiteral xmi:id="lit3" name="SHIPPED"/>
+        <ownedLiteral xmi:id="lit4" name="DELIVERED"/>
+        <ownedLiteral xmi:id="lit5" name="CANCELLED"/>
+      </packagedElement>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="assoc1" name="CustomerPlacesOrder">
+      <ownedEnd xmi:id="end1" name="customer" type="cls_customer" aggregation="none" lower="1" upper="1"/>
+      <ownedEnd xmi:id="end2" name="orders" type="cls_order" aggregation="none" lower="0" upper="*"/>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="assoc2" name="OrderContainsProduct">
+      <ownedEnd xmi:id="end3" name="order" type="cls_order" aggregation="none" lower="1" upper="1"/>
+      <ownedEnd xmi:id="end4" name="products" type="cls_product" aggregation="composite" lower="1" upper="*"/>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Realization" xmi:id="real1" client="cls_order" supplier="iface1"/>
+  </uml:Model>
+</xmi:XMI>
