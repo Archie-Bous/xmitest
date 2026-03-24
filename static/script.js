@@ -108,7 +108,7 @@ parseBtn.addEventListener("click", async () => {
     summaryText.classList.remove("hidden");
     summaryPlaceholder.classList.add("hidden");
     copySummaryBtn.classList.remove("hidden");
-    renderStats(data.model);
+    renderStats(data.model, data.format_info, data.warnings || []);
     statsCard.classList.remove("hidden");
     reviewBtn.disabled = false;
   } catch (err) {
@@ -119,31 +119,80 @@ parseBtn.addEventListener("click", async () => {
   }
 });
 
-function renderStats(model) {
+function renderStats(model, formatInfo, warnings) {
   const items = [
-    { label: "Classes",      value: model.classes?.length ?? 0 },
-    { label: "Interfaces",   value: model.interfaces?.length ?? 0 },
-    { label: "Enumerations", value: model.enumerations?.length ?? 0 },
-    { label: "Associations", value: model.associations?.length ?? 0 },
-    { label: "Dependencies", value: model.dependencies?.length ?? 0 },
-    { label: "Packages",     value: model.packages?.length ?? 0 },
-    { label: "Use Cases",    value: model.use_cases?.length ?? 0 },
-    { label: "Actors",       value: model.actors?.length ?? 0 },
+    { label: "Classes",        value: model.classes?.length ?? 0 },
+    { label: "Interfaces",     value: model.interfaces?.length ?? 0 },
+    { label: "Enumerations",   value: model.enumerations?.length ?? 0 },
+    { label: "Associations",   value: model.associations?.length ?? 0 },
+    { label: "Dependencies",   value: model.dependencies?.length ?? 0 },
+    { label: "Packages",       value: model.packages?.length ?? 0 },
+    { label: "Use Cases",      value: model.use_cases?.length ?? 0 },
+    { label: "Actors",         value: model.actors?.length ?? 0 },
+    { label: "State Machines", value: model.state_machines?.length ?? 0 },
+    { label: "Interactions",   value: model.interactions?.length ?? 0 },
+    { label: "Diagrams",       value: model.diagrams?.length ?? 0 },
   ].filter((i) => i.value > 0);
 
   if (items.length === 0) {
     items.push({ label: "Elements", value: "0" });
   }
 
-  statsGrid.innerHTML = items
-    .map(
-      ({ label, value }) =>
-        `<div class="stat-item">
-           <div class="stat-value">${value}</div>
-           <div class="stat-label">${label}</div>
-         </div>`
-    )
-    .join("");
+  // Format / tool info badge
+  const tool = formatInfo?.tool || "";
+  const xmiVer = formatInfo?.xmi_version || "";
+  const toolBadge = (tool && tool !== "Unknown")
+    ? `<div class="format-badge">
+         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+           <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+           <line x1="12" y1="16" x2="12.01" y2="16"/>
+         </svg>
+         <span><strong>${_esc(tool)}</strong> · XMI ${_esc(xmiVer)}</span>
+       </div>`
+    : "";
+
+  // Stereotypes row
+  const stereos = model.stereotypes_used || [];
+  const stereoRow = stereos.length
+    ? `<div class="stereo-row">
+         <span class="stereo-label">Stereotypes:</span>
+         ${stereos.map(s => `<span class="chip">&laquo;${_esc(s)}&raquo;</span>`).join("")}
+       </div>`
+    : "";
+
+  // Diagrams row
+  const diags = model.diagrams || [];
+  const diagRow = diags.length
+    ? `<div class="stereo-row">
+         <span class="stereo-label">Diagrams:</span>
+         ${diags.map(d => `<span class="chip">${_esc(d.name)}${d.type ? ` [${_esc(d.type)}]` : ""}</span>`).join("")}
+       </div>`
+    : "";
+
+  // Warnings
+  const warningHtml = (warnings || []).length
+    ? `<div class="parse-warnings">
+         ${warnings.map(w => `<div class="parse-warning">⚠ ${_esc(w)}</div>`).join("")}
+       </div>`
+    : "";
+
+  statsGrid.innerHTML =
+    toolBadge +
+    items.map(({ label, value }) =>
+      `<div class="stat-item">
+         <div class="stat-value">${value}</div>
+         <div class="stat-label">${label}</div>
+       </div>`
+    ).join("") +
+    stereoRow + diagRow + warningHtml;
+}
+
+function _esc(str) {
+  return String(str)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 // ── Copy summary ──────────────────────────────────────────────────────────

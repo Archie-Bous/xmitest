@@ -227,6 +227,51 @@ select option { background: var(--bg-card); }
 .stat-value { font-size: 1.4rem; font-weight: 700; color: var(--primary); }
 .stat-label { font-size: .72rem; color: var(--text-muted); margin-top: .1rem; }
 
+/* Format / tool badge */
+.format-badge {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  background: rgba(79,110,247,.08);
+  border: 1px solid rgba(79,110,247,.2);
+  border-radius: var(--radius-sm);
+  padding: .45rem .75rem;
+  font-size: .78rem;
+  color: var(--text-muted);
+  margin-bottom: .2rem;
+}
+.format-badge svg { width: 13px; height: 13px; color: var(--primary); flex-shrink: 0; }
+.format-badge strong { color: var(--text); }
+
+/* Stereotype / diagram rows inside stats */
+.stereo-row {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+  align-items: center;
+  margin-top: .25rem;
+}
+.stereo-label { font-size: .72rem; color: var(--text-muted); }
+
+/* Parse warnings */
+.parse-warnings {
+  grid-column: 1 / -1;
+  margin-top: .25rem;
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+}
+.parse-warning {
+  font-size: .75rem;
+  color: #fbbf24;
+  background: rgba(251,191,36,.07);
+  border: 1px solid rgba(251,191,36,.25);
+  border-radius: var(--radius-sm);
+  padding: .3rem .6rem;
+}
+
 /* ── Summary ── */
 .summary-pre {
   background: var(--bg-input);
