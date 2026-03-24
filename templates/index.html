@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>XMI UML Reviewer</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <div class="app">
+    <!-- ── Header ── -->
+    <header class="header">
+      <div class="header-inner">
+        <div class="logo">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round"
+               stroke-linejoin="round" class="logo-icon">
+            <rect x="3" y="3" width="7" height="7"/>
+            <rect x="14" y="3" width="7" height="7"/>
+            <rect x="3" y="14" width="7" height="7"/>
+            <line x1="17.5" y1="17.5" x2="17.5" y2="21"/>
+            <line x1="14" y1="17.5" x2="21" y2="17.5"/>
+          </svg>
+          <span>XMI UML Reviewer</span>
+        </div>
+        <p class="header-sub">Upload XMI files from your UML tool and get AI-powered model reviews</p>
+      </div>
+    </header>
+
+    <main class="main">
+      <!-- ── Left panel ── -->
+      <aside class="panel panel-left">
+
+        <!-- API Key section -->
+        <section class="card" id="api-section">
+          <h2 class="card-title">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                 stroke-linejoin="round">
+              <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+            </svg>
+            OpenAI API Key
+          </h2>
+          <div class="api-key-row">
+            <input type="password" id="api-key" placeholder="sk-..." autocomplete="off" />
+            <button id="toggle-key" class="btn btn-ghost" title="Show/hide key">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                   stroke-linejoin="round" id="eye-icon">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+          <div class="form-row">
+            <label for="llm-model">Model</label>
+            <select id="llm-model">
+              <option value="gpt-4o-mini">gpt-4o-mini (fast &amp; cheap)</option>
+              <option value="gpt-4o">gpt-4o</option>
+              <option value="gpt-4-turbo">gpt-4-turbo</option>
+              <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+            </select>
+          </div>
+          <p class="hint">Your key is used only for requests from this browser session and is never stored server-side.</p>
+        </section>
+
+        <!-- Upload section -->
+        <section class="card" id="upload-section">
+          <h2 class="card-title">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                 stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            Upload XMI File
+          </h2>
+
+          <div class="drop-zone" id="drop-zone">
+            <div class="drop-zone-inner">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                   stroke-linejoin="round" class="drop-icon">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="12" y1="18" x2="12" y2="12"/>
+                <line x1="9" y1="15" x2="12" y2="12"/>
+                <line x1="15" y1="15" x2="12" y2="12"/>
+              </svg>
+              <p class="drop-text">Drag &amp; drop your XMI / XML / UML file here</p>
+              <p class="drop-hint">or click to browse</p>
+              <input type="file" id="file-input" accept=".xmi,.xml,.uml" hidden />
+            </div>
+          </div>
+
+          <div id="file-info" class="file-info hidden">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" class="file-icon">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <span id="file-name">No file</span>
+            <button id="clear-file" class="btn btn-ghost btn-sm">✕</button>
+          </div>
+
+          <button id="parse-btn" class="btn btn-primary" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                 stroke-linejoin="round">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+            Parse XMI
+          </button>
+
+          <div id="upload-error" class="alert alert-error hidden"></div>
+        </section>
+
+        <!-- Model stats -->
+        <section class="card hidden" id="stats-card">
+          <h2 class="card-title">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                 stroke-linejoin="round">
+              <line x1="18" y1="20" x2="18" y2="10"/>
+              <line x1="12" y1="20" x2="12" y2="4"/>
+              <line x1="6" y1="20" x2="6" y2="14"/>
+            </svg>
+            Model Statistics
+          </h2>
+          <div id="stats-grid" class="stats-grid"></div>
+        </section>
+
+      </aside>
+
+      <!-- ── Right panel ── -->
+      <div class="panel panel-right">
+
+        <!-- Model summary -->
+        <section class="card" id="summary-card">
+          <div class="card-header">
+            <h2 class="card-title">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                   stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+                <polyline points="10 9 9 9 8 9"/>
+              </svg>
+              Model Summary
+            </h2>
+            <button id="copy-summary-btn" class="btn btn-ghost btn-sm hidden" title="Copy to clipboard">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                   stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+              Copy
+            </button>
+          </div>
+          <div id="summary-placeholder" class="placeholder-box">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="1" stroke-linecap="round"
+                 stroke-linejoin="round" class="placeholder-icon">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+              <line x1="12" y1="22.08" x2="12" y2="12"/>
+            </svg>
+            <p>Upload and parse an XMI file to see the model summary here</p>
+          </div>
+          <pre id="summary-text" class="summary-pre hidden"></pre>
+          <div id="parse-loading" class="loading-row hidden">
+            <span class="spinner"></span> Parsing XMI…
+          </div>
+        </section>
+
+        <!-- LLM Review section -->
+        <section class="card" id="review-section">
+          <h2 class="card-title">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                 stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            AI Review
+          </h2>
+
+          <div id="quick-prompts" class="quick-prompts">
+            <span class="quick-prompt-label">Quick prompts:</span>
+            <button class="chip" data-prompt="Please provide a comprehensive review of this UML model including design quality, adherence to best practices, and improvement suggestions.">Full Review</button>
+            <button class="chip" data-prompt="Identify any design pattern opportunities in this model and suggest where they could be applied.">Design Patterns</button>
+            <button class="chip" data-prompt="Review the class hierarchy and associations for any issues such as deep inheritance, circular dependencies, or inappropriate coupling.">Relationships</button>
+            <button class="chip" data-prompt="Evaluate the naming conventions and overall consistency of this UML model.">Naming &amp; Conventions</button>
+            <button class="chip" data-prompt="What SOLID principles violations can you identify in this model? How can they be corrected?">SOLID Principles</button>
+            <button class="chip" data-prompt="Generate a brief textual description of what system this UML model represents.">Describe System</button>
+          </div>
+
+          <div class="question-row">
+            <textarea id="question-input" rows="3"
+              placeholder="Ask anything about your UML model… (e.g. 'What are the main design issues?' or 'How could I improve the class structure?')"></textarea>
+            <button id="review-btn" class="btn btn-accent" disabled>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                   stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"/>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
+              Review
+            </button>
+          </div>
+          <div id="review-error" class="alert alert-error hidden"></div>
+
+          <!-- Chat history -->
+          <div id="chat-history" class="chat-history hidden">
+            <div id="chat-messages"></div>
+          </div>
+
+          <div id="review-loading" class="loading-row hidden">
+            <span class="spinner"></span> The AI is reviewing your model…
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

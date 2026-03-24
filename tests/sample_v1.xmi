@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<XMI xmi.version="1.1" xmlns:UML="org.omg.xmi.namespace.UML">
+  <XMI.header>
+    <XMI.documentation>
+      <XMI.exporter>Rational Rose</XMI.exporter>
+      <XMI.exporterVersion>7.0</XMI.exporterVersion>
+    </XMI.documentation>
+    <XMI.metamodel xmi.name="UML" xmi.version="1.3"/>
+  </XMI.header>
+  <XMI.content>
+    <UML:Model xmi.id="model1" name="LibrarySystem">
+      <UML:Namespace.ownedElement>
+        <UML:Package xmi.id="pkg1" name="Core">
+          <UML:Namespace.ownedElement>
+            <UML:Class xmi.id="cls_book" name="Book" isAbstract="false">
+              <UML:Classifier.feature>
+                <UML:Attribute xmi.id="attr1" name="isbn" visibility="private">
+                  <UML:StructuralFeature.type>
+                    <UML:DataType href="pathmap://UML_LIBRARIES/UMLPrimitiveTypes.library.uml#String"/>
+                  </UML:StructuralFeature.type>
+                </UML:Attribute>
+                <UML:Attribute xmi.id="attr2" name="title" visibility="private">
+                  <UML:StructuralFeature.type>
+                    <UML:DataType href="pathmap://UML_LIBRARIES/UMLPrimitiveTypes.library.uml#String"/>
+                  </UML:StructuralFeature.type>
+                </UML:Attribute>
+                <UML:Attribute xmi.id="attr3" name="available" visibility="private">
+                  <UML:StructuralFeature.type>
+                    <UML:DataType href="pathmap://UML_LIBRARIES/UMLPrimitiveTypes.library.uml#Boolean"/>
+                  </UML:StructuralFeature.type>
+                </UML:Attribute>
+                <UML:Operation xmi.id="op1" name="checkOut" visibility="public">
+                  <UML:BehavioralFeature.parameter>
+                    <UML:Parameter xmi.id="p_return1" name="return" kind="return">
+                      <UML:Parameter.type>
+                        <UML:DataType href="pathmap://UML_LIBRARIES/UMLPrimitiveTypes.library.uml#Boolean"/>
+                      </UML:Parameter.type>
+                    </UML:Parameter>
+                  </UML:BehavioralFeature.parameter>
+                </UML:Operation>
+                <UML:Operation xmi.id="op2" name="returnBook" visibility="public">
+                  <UML:BehavioralFeature.parameter>
+                    <UML:Parameter xmi.id="p_return2" name="return" kind="return">
+                      <UML:Parameter.type>
+                        <UML:DataType href="pathmap://UML_LIBRARIES/UMLPrimitiveTypes.library.uml#Boolean"/>
+                      </UML:Parameter.type>
+                    </UML:Parameter>
+                  </UML:BehavioralFeature.parameter>
+                </UML:Operation>
+              </UML:Classifier.feature>
+            </UML:Class>
+            <UML:Class xmi.id="cls_member" name="Member" isAbstract="false">
+              <UML:Classifier.feature>
+                <UML:Attribute xmi.id="attr4" name="memberId" visibility="private"/>
+                <UML:Attribute xmi.id="attr5" name="name" visibility="public"/>
+                <UML:Operation xmi.id="op3" name="borrowBook" visibility="public"/>
+              </UML:Classifier.feature>
+            </UML:Class>
+            <UML:Class xmi.id="cls_librarian" name="Librarian" isAbstract="false">
+              <UML:GeneralizableElement.generalization>
+                <UML:Generalization xmi.idref="gen1"/>
+              </UML:GeneralizableElement.generalization>
+              <UML:Classifier.feature>
+                <UML:Operation xmi.id="op4" name="addBook" visibility="public"/>
+                <UML:Operation xmi.id="op5" name="removeBook" visibility="public"/>
+              </UML:Classifier.feature>
+            </UML:Class>
+            <UML:Interface xmi.id="iface1" name="Searchable">
+              <UML:Classifier.feature>
+                <UML:Operation xmi.id="op6" name="search" visibility="public">
+                  <UML:BehavioralFeature.parameter>
+                    <UML:Parameter xmi.id="p1" name="query" kind="in"/>
+                  </UML:BehavioralFeature.parameter>
+                </UML:Operation>
+              </UML:Classifier.feature>
+            </UML:Interface>
+            <UML:Enumeration xmi.id="enum1" name="BookCategory">
+              <UML:EnumerationLiteral xmi.id="lit1" name="FICTION"/>
+              <UML:EnumerationLiteral xmi.id="lit2" name="NON_FICTION"/>
+              <UML:EnumerationLiteral xmi.id="lit3" name="REFERENCE"/>
+              <UML:EnumerationLiteral xmi.id="lit4" name="TEXTBOOK"/>
+            </UML:Enumeration>
+            <UML:Generalization xmi.id="gen1" parent="cls_member" child="cls_librarian"/>
+            <UML:Association xmi.id="assoc1" name="borrows">
+              <UML:Connection>
+                <UML:AssociationEnd xmi.id="end1" type="cls_member" name="borrower" aggregation="none">
+                  <UML:AssociationEnd.multiplicity>
+                    <UML:Multiplicity>
+                      <UML:Multiplicity.range>
+                        <UML:MultiplicityRange lower="1" upper="1"/>
+                      </UML:Multiplicity.range>
+                    </UML:Multiplicity>
+                  </UML:AssociationEnd.multiplicity>
+                </UML:AssociationEnd>
+                <UML:AssociationEnd xmi.id="end2" type="cls_book" name="books" aggregation="none">
+                  <UML:AssociationEnd.multiplicity>
+                    <UML:Multiplicity>
+                      <UML:Multiplicity.range>
+                        <UML:MultiplicityRange lower="0" upper="-1"/>
+                      </UML:Multiplicity.range>
+                    </UML:Multiplicity>
+                  </UML:AssociationEnd.multiplicity>
+                </UML:AssociationEnd>
+              </UML:Connection>
+            </UML:Association>
+            <UML:Dependency xmi.id="dep1" name="" client="cls_book" supplier="iface1"/>
+          </UML:Namespace.ownedElement>
+        </UML:Package>
+      </UML:Namespace.ownedElement>
+    </UML:Model>
+  </XMI.content>
+</XMI>

@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1"
+         xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML"
+         xmlns:xmi="http://www.omg.org/XMI">
+  <xmi:Documentation exporter="Enterprise Architect" exporterVersion="15.2"/>
+  <uml:Model xmi:id="model1" name="BankingSystem">
+    <packagedElement xmi:type="uml:Package" xmi:id="pkg1" name="Domain">
+      <!-- EA often puts empty shells here; real detail is in the Extension block -->
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_account" name="Account"/>
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_customer" name="Customer"/>
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_transaction" name="Transaction"/>
+      <packagedElement xmi:type="uml:Interface" xmi:id="iface_auditable" name="Auditable"/>
+      <packagedElement xmi:type="uml:Enumeration" xmi:id="enum_status" name="AccountStatus">
+        <ownedLiteral xmi:id="lit1" name="ACTIVE"/>
+        <ownedLiteral xmi:id="lit2" name="SUSPENDED"/>
+        <ownedLiteral xmi:id="lit3" name="CLOSED"/>
+      </packagedElement>
+    </packagedElement>
+  </uml:Model>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       Enterprise Architect proprietary Extension block.
+       This is where EA stores the actual attributes, operations,
+       connector details, diagrams, and documentation.
+       ════════════════════════════════════════════════════════════════════ -->
+  <xmi:Extension extender="Enterprise Architect" extenderID="6.5">
+    <elements>
+      <element xmi:idref="cls_account" xmi:type="uml:Class" name="Account" scope="public">
+        <properties documentation="Represents a bank account held by a customer."/>
+        <stereotype stereotype="entity"/>
+        <attributes>
+          <attribute xmi:idref="a1" name="accountNumber" scope="private">
+            <model ea_localid="1" type="String" containment="Not Specified"/>
+          </attribute>
+          <attribute xmi:idref="a2" name="balance" scope="private">
+            <model ea_localid="2" type="double" containment="Not Specified"/>
+          </attribute>
+          <attribute xmi:idref="a3" name="status" scope="private">
+            <model ea_localid="3" type="AccountStatus" containment="Not Specified"/>
+          </attribute>
+        </attributes>
+        <operations>
+          <operation xmi:idref="o1" name="deposit" scope="public">
+            <model ea_localid="1" type="void"/>
+            <parameters>
+              <parameter xmi:idref="p1" name="amount" kind="in">
+                <model type="double"/>
+              </parameter>
+            </parameters>
+          </operation>
+          <operation xmi:idref="o2" name="withdraw" scope="public">
+            <model ea_localid="2" type="boolean"/>
+            <parameters>
+              <parameter xmi:idref="p2" name="amount" kind="in">
+                <model type="double"/>
+              </parameter>
+            </parameters>
+          </operation>
+          <operation xmi:idref="o3" name="getBalance" scope="public">
+            <model ea_localid="3" type="double"/>
+          </operation>
+        </operations>
+      </element>
+      <element xmi:idref="cls_customer" xmi:type="uml:Class" name="Customer" scope="public">
+        <properties documentation="A bank customer who owns one or more accounts."/>
+        <stereotype stereotype="entity"/>
+        <attributes>
+          <attribute xmi:idref="a4" name="customerId" scope="private">
+            <model ea_localid="4" type="String"/>
+          </attribute>
+          <attribute xmi:idref="a5" name="name" scope="public">
+            <model ea_localid="5" type="String"/>
+          </attribute>
+          <attribute xmi:idref="a6" name="email" scope="private">
+            <model ea_localid="6" type="String"/>
+          </attribute>
+        </attributes>
+        <operations>
+          <operation xmi:idref="o4" name="openAccount" scope="public">
+            <model ea_localid="4" type="Account"/>
+          </operation>
+          <operation xmi:idref="o5" name="closeAccount" scope="public">
+            <model ea_localid="5" type="void"/>
+            <parameters>
+              <parameter xmi:idref="p3" name="account" kind="in">
+                <model type="Account"/>
+              </parameter>
+            </parameters>
+          </operation>
+        </operations>
+      </element>
+      <element xmi:idref="cls_transaction" xmi:type="uml:Class" name="Transaction" scope="public">
+        <properties documentation="Records a debit or credit operation on an account."/>
+        <stereotype stereotype="entity"/>
+        <attributes>
+          <attribute xmi:idref="a7" name="transactionId" scope="private">
+            <model ea_localid="7" type="String"/>
+          </attribute>
+          <attribute xmi:idref="a8" name="amount" scope="private">
+            <model ea_localid="8" type="double"/>
+          </attribute>
+          <attribute xmi:idref="a9" name="timestamp" scope="private">
+            <model ea_localid="9" type="Date"/>
+          </attribute>
+        </attributes>
+      </element>
+      <element xmi:idref="iface_auditable" xmi:type="uml:Interface" name="Auditable" scope="public">
+        <properties documentation="Marks a class as auditable — must provide an audit trail."/>
+        <operations>
+          <operation xmi:idref="o6" name="getAuditLog" scope="public">
+            <model ea_localid="6" type="List"/>
+          </operation>
+        </operations>
+      </element>
+    </elements>
+    <connectors>
+      <!-- Customer 1 owns * Account -->
+      <connector xmi:idref="conn1">
+        <source xmi:idref="src1">
+          <model type="Class" name="Customer"/>
+          <role name="owner"/>
+          <multiplicity lower="1" upper="1"/>
+          <type aggregation="0"/>
+        </source>
+        <target xmi:idref="tgt1">
+          <model type="Class" name="Account"/>
+          <role name="accounts"/>
+          <multiplicity lower="0" upper="*"/>
+          <type aggregation="0"/>
+        </target>
+        <properties ea_type="Association" direction="Source -&gt; Destination"/>
+      </connector>
+      <!-- Account 1 has * Transaction -->
+      <connector xmi:idref="conn2">
+        <source xmi:idref="src2">
+          <model type="Class" name="Account"/>
+          <role name="account"/>
+          <multiplicity lower="1" upper="1"/>
+          <type aggregation="0"/>
+        </source>
+        <target xmi:idref="tgt2">
+          <model type="Class" name="Transaction"/>
+          <role name="transactions"/>
+          <multiplicity lower="0" upper="*"/>
+          <type aggregation="2"/>
+        </target>
+        <properties ea_type="Composition" direction="Source -&gt; Destination"/>
+      </connector>
+      <!-- Account realizes Auditable -->
+      <connector xmi:idref="conn3">
+        <source xmi:idref="src3">
+          <model type="Class" name="Account"/>
+        </source>
+        <target xmi:idref="tgt3">
+          <model type="Interface" name="Auditable"/>
+        </target>
+        <properties ea_type="Realization"/>
+      </connector>
+    </connectors>
+    <diagrams>
+      <diagram xmi:id="diag1">
+        <model package="pkg1" type="Logical"/>
+        <properties name="Domain Class Diagram" type="Logical" documentation="Main class diagram"/>
+      </diagram>
+      <diagram xmi:id="diag2">
+        <model package="pkg1" type="Sequence"/>
+        <properties name="Account Deposit Flow" type="Sequence"/>
+      </diagram>
+    </diagrams>
+  </xmi:Extension>
+</xmi:XMI>
