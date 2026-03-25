@@ -11,7 +11,7 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from app import app as flask_app, parse_xmi, model_to_text
+from app import app as flask_app, parse_xmi, model_to_text, score_model
 
 SAMPLE_XMI_PATH = os.path.join(os.path.dirname(__file__), "sample.xmi")
 SAMPLE_V1_PATH  = os.path.join(os.path.dirname(__file__), "sample_v1.xmi")
@@ -374,4 +374,182 @@ def test_review_no_summary(client):
     assert res.status_code == 400
     body = json.loads(res.data)
     assert "error" in body
+
+
+# ── score_model() unit tests ──────────────────────────────────────────────
+
+def test_score_model_structure():
+    """score_model must return the expected top-level keys."""
+    model = parse_xmi(_load(SAMPLE_XMI_PATH))
+    quality = score_model(model)
+    assert "overall_score" in quality
+    assert "grade" in quality
+    assert "criteria" in quality
+    assert "top_issues" in quality
+
+
+def test_score_model_overall_range():
+    """overall_score must be an integer in [0, 100]."""
+    model = parse_xmi(_load(SAMPLE_XMI_PATH))
+    quality = score_model(model)
+    assert isinstance(quality["overall_score"], int)
+    assert 0 <= quality["overall_score"] <= 100
+
+
+def test_score_model_grade_valid():
+    """Grade must be one of A / B / C / D / F."""
+    model = parse_xmi(_load(SAMPLE_XMI_PATH))
+    quality = score_model(model)
+    assert quality["grade"] in ("A", "B", "C", "D", "F")
+
+
+def test_score_model_six_criteria():
+    """Quality report must include exactly six criteria."""
+    model = parse_xmi(_load(SAMPLE_XMI_PATH))
+    quality = score_model(model)
+    assert len(quality["criteria"]) == 6
+
+
+def test_score_model_criteria_keys():
+    """Each criterion must have name, description, score, weight, and issues."""
+    model = parse_xmi(_load(SAMPLE_XMI_PATH))
+    quality = score_model(model)
+    for c in quality["criteria"]:
+        assert "name" in c
+        assert "description" in c
+        assert "score" in c
+        assert "weight" in c
+        assert "issues" in c
+        assert 0 <= c["score"] <= 100
+
+
+def test_score_model_weights_sum():
+    """Criteria weights must sum to 1.0."""
+    model = parse_xmi(_load(SAMPLE_XMI_PATH))
+    quality = score_model(model)
+    total_weight = sum(c["weight"] for c in quality["criteria"])
+    assert abs(total_weight - 1.0) < 1e-9
+
+
+def test_score_model_top_issues_list():
+    """top_issues must be a list; each entry has criterion and issue keys."""
+    model = parse_xmi(_load(SAMPLE_XMI_PATH))
+    quality = score_model(model)
+    assert isinstance(quality["top_issues"], list)
+    for issue in quality["top_issues"]:
+        assert "criterion" in issue
+        assert "issue" in issue
+
+
+def test_score_model_empty_model():
+    """score_model must handle a completely empty model without errors."""
+    from app import _empty_result
+    empty = _empty_result()
+    empty["format_info"] = {"xmi_version": "2.x", "tool": "Test", "tool_version": ""}
+    quality = score_model(empty)
+    assert quality["grade"] in ("A", "B", "C", "D", "F")
+
+
+def test_score_model_ea():
+    """score_model must work on the EA sample and return a well-documented model."""
+    model = parse_xmi(_load(SAMPLE_EA_PATH))
+    quality = score_model(model)
+    # EA sample has comments on Account – doc score should be non-zero
+    doc_criterion = next(c for c in quality["criteria"] if "Documentation" in c["name"])
+    assert doc_criterion["score"] > 0
+
+
+def test_upload_includes_quality(client):
+    """The /upload endpoint must include a 'quality' key in its response."""
+    xml_bytes = _load(SAMPLE_XMI_PATH)
+    data = {"file": (io.BytesIO(xml_bytes), "sample.xmi")}
+    res = client.post("/upload", data=data, content_type="multipart/form-data")
+    assert res.status_code == 200
+    body = json.loads(res.data)
+    assert "quality" in body
+    assert "overall_score" in body["quality"]
+    assert "grade" in body["quality"]
+    assert "criteria" in body["quality"]
+
+
+def test_score_endpoint_valid(client):
+    """The /score endpoint must accept a model dict and return quality."""
+    model = parse_xmi(_load(SAMPLE_XMI_PATH))
+    payload = {"model": model}
+    res = client.post("/score", data=json.dumps(payload),
+                      content_type="application/json")
+    assert res.status_code == 200
+    body = json.loads(res.data)
+    assert "quality" in body
+    assert body["quality"]["grade"] in ("A", "B", "C", "D", "F")
+
+
+def test_score_endpoint_no_model(client):
+    """The /score endpoint must return 400 when no model is provided."""
+    res = client.post("/score", data=json.dumps({}),
+                      content_type="application/json")
+    assert res.status_code == 400
+    body = json.loads(res.data)
+    assert "error" in body
+
+
+# ── Noise filtering tests ─────────────────────────────────────────────────
+
+def test_noise_ns_filtering():
+    """Elements in proprietary tool namespaces must be silently skipped."""
+    xmi_with_noise = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1"
+    xmlns:xmi="http://www.omg.org/XMI"
+    xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML"
+    xmlns:notation="http://www.eclipse.org/gmf/runtime/1.0.2/notation"
+    xmlns:ptc="http://www.ptc.com/xmi/1.0">
+  <uml:Model xmi:id="m1" name="NoisyModel">
+    <packagedElement xmi:type="uml:Class" xmi:id="c1" name="NoiseFreeClass">
+      <ownedAttribute xmi:id="a1" name="myAttr" type="String"/>
+    </packagedElement>
+  </uml:Model>
+  <!-- This should be skipped entirely -->
+  <notation:Diagram xmi:id="d1" type="Class">
+    <children xmi:id="ch1"/>
+  </notation:Diagram>
+  <ptc:ToolData xmi:id="td1" someKey="someValue"/>
+</xmi:XMI>"""
+    model = parse_xmi(xmi_with_noise)
+    assert model["model_name"] == "NoisyModel"
+    class_names = [c["name"] for c in model["classes"]]
+    assert "NoiseFreeClass" in class_names
+
+
+def test_layout_element_filtering():
+    """Layout-only element names (e.g. 'bounds') must not create spurious classes."""
+    xmi_with_layout = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1"
+    xmlns:xmi="http://www.omg.org/XMI"
+    xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML">
+  <uml:Model xmi:id="m1" name="LayoutModel">
+    <packagedElement xmi:type="uml:Class" xmi:id="c1" name="RealClass"/>
+    <bounds x="10" y="20" width="100" height="50"/>
+    <appearance color="#FFFFFF"/>
+  </uml:Model>
+</xmi:XMI>"""
+    model = parse_xmi(xmi_with_layout)
+    assert model["model_name"] == "LayoutModel"
+    class_names = [c["name"] for c in model["classes"]]
+    assert "RealClass" in class_names
+    # bounds and appearance must not appear as classes
+    assert "bounds" not in class_names
+    assert "appearance" not in class_names
+
+
+def test_ptc_modeler_tool_detection():
+    """Files with PTC namespace URIs must be detected as PTC Integrity Modeler."""
+    xmi_ptc = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1"
+    xmlns:xmi="http://www.omg.org/XMI"
+    xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML"
+    xmlns:ptc="http://www.ptc.com/xmi/modeler/1.0">
+  <uml:Model xmi:id="m1" name="PTCModel"/>
+</xmi:XMI>"""
+    model = parse_xmi(xmi_ptc)
+    assert "PTC" in model["format_info"]["tool"]
 

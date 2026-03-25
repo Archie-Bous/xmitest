@@ -177,6 +177,55 @@
           </div>
         </section>
 
+        <!-- Quality Score card -->
+        <section class="card hidden" id="quality-card">
+          <h2 class="card-title">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                 stroke-linejoin="round">
+              <circle cx="12" cy="8" r="6"/>
+              <path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/>
+            </svg>
+            Model Quality Score
+          </h2>
+
+          <!-- Overall score -->
+          <div class="quality-overview">
+            <div class="quality-grade-wrap">
+              <div id="quality-grade" class="quality-grade">–</div>
+              <div id="quality-score-label" class="quality-score-label">–/100</div>
+            </div>
+            <div class="quality-bar-wrap">
+              <div class="quality-bar-track">
+                <div id="quality-bar-fill" class="quality-bar-fill" style="width:0%"></div>
+              </div>
+              <div id="quality-bar-legend" class="quality-bar-legend">
+                <span class="qbl-f">F</span><span class="qbl-d">D</span>
+                <span class="qbl-c">C</span><span class="qbl-b">B</span>
+                <span class="qbl-a">A</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Per-criterion rows -->
+          <div id="quality-criteria" class="quality-criteria"></div>
+
+          <!-- Top issues -->
+          <div id="quality-issues-wrap" class="quality-issues-wrap hidden">
+            <div class="quality-issues-title">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                   stroke-linejoin="round">
+                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              Top Issues
+            </div>
+            <ul id="quality-issues-list" class="quality-issues-list"></ul>
+          </div>
+        </section>
+
         <!-- LLM Review section -->
         <section class="card" id="review-section">
           <h2 class="card-title">
@@ -196,6 +245,7 @@
             <button class="chip" data-prompt="Evaluate the naming conventions and overall consistency of this UML model.">Naming &amp; Conventions</button>
             <button class="chip" data-prompt="What SOLID principles violations can you identify in this model? How can they be corrected?">SOLID Principles</button>
             <button class="chip" data-prompt="Generate a brief textual description of what system this UML model represents.">Describe System</button>
+            <button class="chip" data-prompt="Based on the quality scores shown, explain the most critical improvements this model needs and provide concrete refactoring suggestions for each issue.">Quality Improvements</button>
           </div>
 
           <div class="question-row">
